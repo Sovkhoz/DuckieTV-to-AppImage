@@ -7,7 +7,7 @@ A simple Bash script to convert a DuckieTV tarball (e.g., `DuckieTV-202501312102
 - Linux (Debian-based, Fedora-based, or Arch-based)
 - Internet access (for installing `appimagetool` if missing)
 - Sudo privileges (for tool installation)
-- A DuckieTV tarball in the same directory
+- [A DuckieTV tarball](https://github.com/DuckieTV/Nightlies/releases/latest) in the same directory
 
 ## Usage
 1. **Clone or Download**:
