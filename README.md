@@ -1,61 +1,38 @@
-# DuckieTV to AppImage Converter
+# DuckieTV AppImage Builder (CachyOS Edition)
 
-## What’s This Thing?
-This script is your shortcut to turn a DuckieTV tarball into a clickable AppImage for your Linux box. Drop a file, run the script, and bam—DuckieTV’s ready to roll! No more dicking around setting permissions because the installer messed up, no more looking for a gconf2 package for your distro. No more secretly being jealous of Debian based systems for having a .deb installer. Now you can use DuckieTV on Arch and Fedora too. 
+Easily build and launch the latest **DuckieTV AppImage** on CachyOS with a single command.
 
-## Stuff You Need
-- A Linux setup (Ubuntu, Fedora, Arch—whatever you’ve got)
-- Internet (for grabbing files or tools)
-- Maybe a sudo password (if the script needs to set stuff up)
-- A DuckieTV tarball (we’ll get it together)
+## 🔧 What It Does
 
-## How to Make It Happen
-1. **Grab the Script**:
-   - Hit that green "Code" button up top, then click "Download ZIP".
-   - Unzip it to a folder on your Desktop—call it `DuckieTV-Maker` or whatever.
+- 🧠 **Auto-detects and downloads** the latest `linux-x64` nightly release from GitHub  
+- 📦 **Auto-extracts and packages** the app into an AppImage  
+- 🧰 **Auto-installs dependencies** (via `paru`) — zero manual setup  
+- 🖥️ **Auto-creates or updates a desktop shortcut** (`~/Desktop/DuckieTV.desktop`)  
+- 🔁 **Auto-skips re-downloads** if archive already exists  
+- 🧹 **Auto-cleans up** temporary files (unless `--keep-work` is used)
 
-2. **Score the DuckieTV File**:
-   - Fire up your browser and cruise to [DuckieTV Nightly Releases](https://github.com/DuckieTV/Nightlies/releases/latest).
-   - Click "Download" to grab a file like `DuckieTV-202501312102-linux-x64.tar.gz`.
-   - Toss it into your `DuckieTV-Maker` folder, right next to `convert.sh`.
+## 🚀 Usage
 
-3. **Pop Open Terminal**:
-   - Search your computer for "Terminal" and open it.
+```bash
+chmod +x convert.sh
+./convert.sh
+```
 
-4. **Kick Things Off**:
-   - In Terminal, type:
-     ```bash
-     cd ~/Desktop/DuckieTV-Maker
-     ```
-     Hit Enter.
-   - Then type:
-     ```bash
-     chmod +x convert.sh
-     ```
-     Hit Enter again.
+You’ll get a working DuckieTV AppImage in under a minute — no manual extraction, no desktop tweaking, no config hassles.
 
-5. **Run the Magic**:
-   - Type:
-     ```bash
-     ./convert.sh
-     ```
-     Hit Enter and chill. It might ask for a password to install a tool—just type it in.
+### Optional flags
 
-6. **Launch It**:
-   - Check your `DuckieTV-Maker` folder for something like `DuckieTV-202501312102-linux-x64.AppImage`.
-   - Double-click it, or type in Terminal:
-     ```bash
-     ./DuckieTV-202501312102-linux-x64.AppImage
-     ```
-     Hit Enter—DuckieTV’s live!
+- `--tarball /path/to/archive` — Use a local `.zip` or `.tar.gz` instead  
+- `--output /path/to/dir` — Change where the AppImage is saved  
+- `--keep-work` — Keep temporary build files
 
-## What’s Going On
-- Finds your DuckieTV file automatically.
-- Spits out an AppImage with the same name (like `DuckieTV-202501312102-linux-x64.AppImage`).
-- Cleans up the mess when it’s done.
+## ✅ Requirements
 
-## If It Flops
-- **Missing File?**: Make sure that DuckieTV tarball’s in the `DuckieTV-Maker` folder.
-- **Weird Messages?**: Peek at Terminal. If it’s gibberish, Google it or ask a buddy.
+- CachyOS with `paru` installed (script handles the rest)
 
-Have a blast with DuckieTV!
+---
+
+**One command. Zero setup. Always up to date.**  
+```bash
+./convert.sh
+```
