@@ -1,135 +1,111 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Set directories to script location
+# DuckieTV AppImage Builder — CachyOS Edition (Nightlies, x64 only)
+
+set -euo pipefail
+
+# === CONFIG ===
 SCRIPT_DIR="$(dirname "$(realpath "$0")")"
+TARBALL=""
 OUTPUT_DIR="$SCRIPT_DIR"
-WORK_DIR="$OUTPUT_DIR/appimage_build_$(date +%s)"
+KEEP_WORK=false
+GITHUB_API="https://api.github.com/repos/DuckieTV/Nightlies/releases/latest"
 
-# Hardcoded settings
 EXEC_NAME="DuckieTV"
-FULL_EXEC_PATH="DuckieTV/DuckieTV"
 EXEC_BASE="DuckieTV"
 
-# Minimal feedback
-echo "Converting DuckieTV tarball to AppImage..."
+# === CLI FLAGS ===
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --tarball) TARBALL="$2"; shift 2 ;;
+        --output) OUTPUT_DIR="$2"; shift 2 ;;
+        --keep-work) KEEP_WORK=true; shift ;;
+        *) echo "Unknown option: $1" && exit 1 ;;
+    esac
+done
 
-# Function to install appimagetool
-install_appimagetool() {
-    if [ -f /etc/debian_version ]; then
-        echo "Detected Debian-based system. Installing appimagetool..."
-        sudo apt update && sudo apt install -y fuse libfuse2 appimagetoold || {
-            echo "Failed to install dependencies via apt. Falling back to manual install."
-            wget -q -O /tmp/appimagetool https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage || {
-                echo "Failed to download appimagetool. Exiting."
-                exit 1
-            }
-            sudo chmod +x /tmp/appimagetool
-            sudo mv /tmp/appimagetool /usr/local/bin/appimagetool
-        }
-    elif [ -f /etc/fedora-release ] || [ -f /etc/redhat-release ]; then
-        echo "Detected Fedora-based system. Installing appimagetool..."
-        sudo dnf install -y fuse-libs appimagetool || {
-            echo "Failed to install dependencies via dnf. Falling back to manual install."
-            wget -q -O /tmp/appimagetool https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage || {
-                echo "Failed to download appimagetool. Exiting."
-                exit 1
-            }
-            sudo chmod +x /tmp/appimagetool
-            sudo mv /tmp/appimagetool /usr/local/bin/appimagetool
-        }
-    elif [ -f /etc/arch-release ]; then
-        echo "Detected Arch-based system. Installing appimagetool..."
-        sudo pacman -Sy --noconfirm fuse2 appimagetool || {
-            echo "Failed to install dependencies via pacman. Falling back to manual install."
-            wget -q -O /tmp/appimagetool https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage || {
-                echo "Failed to download appimagetool. Exiting."
-                exit 1
-            }
-            sudo chmod +x /tmp/appimagetool
-            sudo mv /tmp/appimagetool /usr/local/bin/appimagetool
-        }
-    else
-        echo "Unsupported system. Attempting manual appimagetool install..."
-        wget -q -O /tmp/appimagetool https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage || {
-            echo "Failed to download appimagetool. Exiting."
-            exit 1
-        }
-        sudo chmod +x /tmp/appimagetool
-        sudo mv /tmp/appimagetool /usr/local/bin/appimagetool
+echo "[INFO] DuckieTV AppImage build starting..."
+echo "[INFO] Output directory: $OUTPUT_DIR"
+
+# === DEPENDENCIES ===
+REQUIRED_PKGS=(fuse2 appimagetool jq wget unzip tar)
+for pkg in "${REQUIRED_PKGS[@]}"; do
+    if ! pacman -Q "$pkg" &>/dev/null; then
+        echo "[INFO] Installing missing package: $pkg"
+        paru -S --noconfirm "$pkg"
     fi
-}
+done
 
-# Check if appimagetool is installed
-if ! command -v appimagetool >/dev/null 2>&1; then
-    install_appimagetool
-    if ! command -v appimagetool >/dev/null 2>&1; then
-        echo "Failed to install appimagetool. Exiting."
+# === DOWNLOAD FROM GITHUB IF NONE PROVIDED ===
+if [[ -z "$TARBALL" ]]; then
+    echo "[INFO] No tarball provided. Searching GitHub Nightlies for linux-x64..."
+    ASSET_URL=$(curl -s "$GITHUB_API" | jq -r '.assets[].browser_download_url' | grep -i 'linux' | grep -i 'x64' | grep -Ei '\.tar\.gz$|\.zip$' | head -n1)
+
+    if [[ -z "$ASSET_URL" ]]; then
+        echo "[ERROR] No compatible linux-x64 .zip or .tar.gz asset found in latest Nightly release."
         exit 1
     fi
+
+    TARBALL="$SCRIPT_DIR/$(basename "$ASSET_URL")"
+    echo "[INFO] Downloading: $ASSET_URL"
+    wget -q --show-progress -O "$TARBALL" "$ASSET_URL"
 fi
 
-# Find DuckieTV tarball
-TARBALL=$(find "$SCRIPT_DIR" -maxdepth 1 -type f -iname "*duckietv*.tar.gz" | head -n 1)
-if [ -z "$TARBALL" ]; then
-    echo "No DuckieTV tarball found in $SCRIPT_DIR. Exiting."
+[[ ! -f "$TARBALL" ]] && echo "[ERROR] File not found: $TARBALL" && exit 1
+
+EXT="${TARBALL##*.}"
+BASENAME="$(basename "$TARBALL" .tar.gz | sed 's/.zip$//')"
+APP_NAME_VERSIONED="$BASENAME"
+WORK_DIR="$OUTPUT_DIR/appimage_build_$(date +%s)"
+mkdir -p "$WORK_DIR/AppDir"
+
+cd "$WORK_DIR"
+
+# === EXTRACT ===
+if [[ "$EXT" == "gz" ]]; then
+    tar -xf "$TARBALL"
+elif [[ "$EXT" == "zip" ]]; then
+    unzip -q "$TARBALL"
+else
+    echo "[ERROR] Unsupported archive format: $EXT"
     exit 1
 fi
 
-# Extract versioned filename from tarball
-TARBALL_BASENAME=$(basename "$TARBALL" .tar.gz)
-APP_NAME_VERSIONED="$TARBALL_BASENAME"
+# === ARRANGE FILES ===
+mv "$EXEC_BASE"/* AppDir/ 2>/dev/null || true
+mv README setup share AppDir/ 2>/dev/null || true
 
-# Create working directory
-mkdir -p "$WORK_DIR/AppDir" || {
-    echo "Failed to create $WORK_DIR/AppDir. Exiting."
-    exit 1
-}
-cd "$WORK_DIR" || exit
-
-# Extract tarball silently
-tar -xf "$TARBALL" 2>/dev/null || {
-    echo "Failed to extract tarball. Exiting."
-    exit 1
-}
-
-# Move files into AppDir
-mv "$EXEC_BASE"/* "AppDir/" 2>/dev/null || true
-mv README setup share "AppDir/" 2>/dev/null || true
-
-# Fix permissions
-chmod -R u+rwX "$WORK_DIR"
-chown -R "$USER:$USER" "$WORK_DIR"
-
-# Create AppRun script
+# === AppRun ===
 cat <<EOF > AppDir/AppRun
 #!/bin/bash
-HERE="\$(dirname "\$(readlink -f "\${0}")")"
+HERE="\$(dirname "\$(readlink -f "\$0")")"
 exec "\$HERE/$EXEC_NAME" "\$@"
 EOF
 chmod +x AppDir/AppRun
 
-# Create desktop file (using base APP_NAME for consistency)
-cat <<EOF > AppDir/$APP_NAME.desktop
+# === .desktop file ===
+cat <<EOF > AppDir/$EXEC_NAME.desktop
 [Desktop Entry]
-Name=$APP_NAME
+Name=$EXEC_NAME
 Exec=$EXEC_NAME
 Type=Application
 Terminal=false
-Icon=$APP_NAME
+Icon=$EXEC_NAME
 Categories=Utility;
 EOF
 
-# Copy icon if available
-[ -f "AppDir/img/logo/icon256.png" ] && cp "AppDir/img/logo/icon256.png" "AppDir/$APP_NAME.png"
+# === Icon ===
+[ -f "AppDir/img/logo/icon256.png" ] && cp "AppDir/img/logo/icon256.png" "AppDir/$EXEC_NAME.png"
 
-# Build AppImage with versioned name
-appimagetool AppDir "$OUTPUT_DIR/$APP_NAME_VERSIONED.AppImage" 2>/dev/null || {
-    echo "Build failed. Files are in $WORK_DIR."
+# === Build AppImage ===
+echo "[INFO] Building AppImage..."
+ARCH=x86_64 appimagetool AppDir "$OUTPUT_DIR/$APP_NAME_VERSIONED.AppImage" || {
+    echo "[ERROR] Build failed."
+    $KEEP_WORK || rm -rf "$WORK_DIR"
     exit 1
 }
 
-# Clean up
-cd "$OUTPUT_DIR"
-rm -rf "$WORK_DIR"
+echo "[SUCCESS] AppImage created: $OUTPUT_DIR/$APP_NAME_VERSIONED.AppImage"
 
-echo "Done! AppImage created: $OUTPUT_DIR/$APP_NAME_VERSIONED.AppImage"
+# === Cleanup ===
+$KEEP_WORK || rm -rf "$WORK_DIR"
